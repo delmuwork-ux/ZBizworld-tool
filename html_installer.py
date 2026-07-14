@@ -148,20 +148,27 @@ class InstallerAPI:
                 os.remove(temp_zip)
                 self.log("Giải nén trình duyệt thành công.")
 
-            # Check and download backend runtime if missing
+            # Always download and extract backend runtime on both Clean and Update installs to get the latest code/UI
             runtime_bin_path = os.path.join(self.install_dir, "storage", "runtime", "bin")
-            if not os.path.exists(runtime_bin_path) or self.install_type == "clean":
-                self.set_progress(65, "Đang tải các thành phần hệ thống phụ trợ...")
-                self.log("Đang tải Backend Runtime từ GitHub...")
-                temp_zip = os.path.join(os.environ["TEMP"], "backend_runtime.zip")
-                self._download_file(BACKEND_RUNTIME_URL, temp_zip, 65, 80)
-                
-                self.set_progress(80, "Đang giải nén các thành phần hệ thống...")
-                self.log("Đang giải nén Backend Runtime...")
-                with zipfile.ZipFile(temp_zip, 'r') as zip_ref:
-                    zip_ref.extractall(os.path.join(self.install_dir, "storage", "runtime"))
-                os.remove(temp_zip)
-                self.log("Giải nén Backend Runtime thành công.")
+            if os.path.exists(runtime_bin_path):
+                self.log("Đang dọn dẹp các tệp mã nguồn cũ...")
+                try:
+                    shutil.rmtree(runtime_bin_path)
+                except Exception as e:
+                    self.log(f"Cảnh báo dọn dẹp mã nguồn cũ: {e}")
+                    shutil.rmtree(runtime_bin_path, ignore_errors=True)
+
+            self.set_progress(65, "Đang tải các thành phần hệ thống phụ trợ...")
+            self.log("Đang tải Backend Runtime từ GitHub...")
+            temp_zip = os.path.join(os.environ["TEMP"], "backend_runtime.zip")
+            self._download_file(BACKEND_RUNTIME_URL, temp_zip, 65, 80)
+            
+            self.set_progress(80, "Đang giải nén các thành phần hệ thống...")
+            self.log("Đang giải nén Backend Runtime...")
+            with zipfile.ZipFile(temp_zip, 'r') as zip_ref:
+                zip_ref.extractall(os.path.join(self.install_dir, "storage", "runtime"))
+            os.remove(temp_zip)
+            self.log("Giải nén Backend Runtime thành công.")
 
             # Prerequisites check (VC++ Redist & WebView2)
             self.set_progress(85, "Đang kiểm tra và cài đặt các thành phần phụ thuộc...")
