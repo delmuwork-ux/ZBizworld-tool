@@ -1314,7 +1314,10 @@ def check_and_run_updates(current_dir):
                 
             remote_version = release_info.get("tag_name", "").strip()
             
-            if remote_version and remote_version != local_version:
+            def normalize_v(v):
+                return v.lower().lstrip('v').strip()
+                
+            if remote_version and normalize_v(remote_version) != normalize_v(local_version):
                 download_url = None
                 for asset in release_info.get("assets", []):
                     if asset.get("name") == "backend_runtime.zip":

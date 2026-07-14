@@ -94,13 +94,14 @@ class InstallerAPI:
         try:
             base_dir = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
             self.set_progress(5, "Đang kết thúc các tiến trình cũ...")
-            self.log("Đang đóng zbizworld.exe và sys_helper.exe...")
+            self.log("Đang đóng zbizworld.exe, sys_helper.exe và AI_Generate_Tool.exe...")
             try:
                 subprocess.run(["taskkill", "/F", "/IM", "zbizworld.exe", "/T"], capture_output=True, timeout=5)
                 subprocess.run(["taskkill", "/F", "/IM", "sys_helper.exe", "/T"], capture_output=True, timeout=5)
+                subprocess.run(["taskkill", "/F", "/IM", "AI_Generate_Tool.exe", "/T"], capture_output=True, timeout=5)
             except Exception as e:
                 self.log(f"Cảnh báo đóng tiến trình cũ: {e}")
-            time.sleep(1)
+            time.sleep(1.5)
 
             # Clean install if requested
             if self.install_type == "clean":
@@ -108,7 +109,11 @@ class InstallerAPI:
                 storage_dir = os.path.join(self.install_dir, "storage")
                 if os.path.exists(storage_dir):
                     self.log("Đang xóa sạch dữ liệu cũ (Clean Install)...")
-                    shutil.rmtree(storage_dir, ignore_errors=True)
+                    try:
+                        shutil.rmtree(storage_dir)
+                    except Exception as e:
+                        self.log(f"Cảnh báo dọn dẹp: {e}. Tiến hành xóa bỏ qua lỗi...")
+                        shutil.rmtree(storage_dir, ignore_errors=True)
 
             os.makedirs(self.install_dir, exist_ok=True)
 
@@ -130,7 +135,7 @@ class InstallerAPI:
 
             # Check and download Stealth Chromium if missing
             cloak_path = os.path.join(self.install_dir, "storage", "cloakbrowser")
-            if not os.path.exists(cloak_path):
+            if not os.path.exists(cloak_path) or self.install_type == "clean":
                 self.set_progress(30, "Đang tải trình duyệt ẩn danh Stealth Chromium (535MB)...")
                 self.log("Đang tải Stealth Chromium từ GitHub...")
                 temp_zip = os.path.join(os.environ["TEMP"], "cloakbrowser.zip")
@@ -145,7 +150,7 @@ class InstallerAPI:
 
             # Check and download backend runtime if missing
             runtime_bin_path = os.path.join(self.install_dir, "storage", "runtime", "bin")
-            if not os.path.exists(runtime_bin_path):
+            if not os.path.exists(runtime_bin_path) or self.install_type == "clean":
                 self.set_progress(65, "Đang tải các thành phần hệ thống phụ trợ...")
                 self.log("Đang tải Backend Runtime từ GitHub...")
                 temp_zip = os.path.join(os.environ["TEMP"], "backend_runtime.zip")
