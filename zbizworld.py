@@ -953,44 +953,25 @@ def generate_license(hwid, target_dir, expire_time):
 
 def find_chromium():
     import winreg
-    default_browser = None
     
-    # Method 1: Query from http shell open command (extremely robust, no permission locks)
-    try:
-        with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, r"http\shell\open\command") as key:
-            cmd, _ = winreg.QueryValueEx(key, "")
-            cmd_lower = cmd.lower()
-            if "chrome.exe" in cmd_lower:
-                default_browser = "chrome"
-            elif "msedge.exe" in cmd_lower:
-                default_browser = "msedge"
-            elif "brave.exe" in cmd_lower:
-                default_browser = "brave"
-    except Exception:
-        pass
+    # Always prioritize Google Chrome first, Brave second, and Microsoft Edge last.
+    # Chrome is the most stable and compatible browser for our automation and uvicorn UI.
+    browsers = ["chrome", "brave", "msedge"]
 
-    # Method 2: Query from UserChoice (fallback)
-    if not default_browser:
-        try:
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice") as key:
-                prog_id, _ = winreg.QueryValueEx(key, "ProgId")
-                prog_id_lower = prog_id.lower()
-                if "chrome" in prog_id_lower:
-                    default_browser = "chrome"
-                elif "edge" in prog_id_lower or "msedge" in prog_id_lower:
-                    default_browser = "msedge"
-                elif "brave" in prog_id_lower:
-                    default_browser = "brave"
-        except Exception:
-            pass
-
-    browsers = ["chrome", "msedge", "brave"]
-    if default_browser and default_browser in browsers:
-        browsers.remove(default_browser)
-        browsers.insert(0, default_browser)
-
-    # 1. Search Registry App Paths
+    program_files = [
+        os.environ.get("PROGRAMFILES", "C:\\Program Files"),
+        os.environ.get("PROGRAMFILES(X86)", "C:\\Program Files (x86)"),
+        os.environ.get("LOCALAPPDATA", "")
+    ]
+    
+    browser_map = {
+        "chrome": r"Google\Chrome\Application\chrome.exe",
+        "brave": r"BraveSoftware\Brave-Browser\Application\brave.exe",
+        "msedge": r"Microsoft\Edge\Application\msedge.exe"
+    }
+    
     for b in browsers:
+        # Check 1: Registry App Paths
         paths_to_check = [
             rf"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\{b}.exe",
             rf"SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\App Paths\{b}.exe"
@@ -1006,20 +987,7 @@ def find_chromium():
                 except Exception:
                     pass
 
-    # 2. Search common filesystem paths (Outer loop: prioritized browser, Inner loop: program files path)
-    program_files = [
-        os.environ.get("PROGRAMFILES", "C:\\Program Files"),
-        os.environ.get("PROGRAMFILES(X86)", "C:\\Program Files (x86)"),
-        os.environ.get("LOCALAPPDATA", "")
-    ]
-    
-    browser_map = {
-        "chrome": r"Google\Chrome\Application\chrome.exe",
-        "brave": r"BraveSoftware\Brave-Browser\Application\brave.exe",
-        "msedge": r"Microsoft\Edge\Application\msedge.exe"
-    }
-    
-    for b in browsers:
+        # Check 2: Filesystem common paths
         rp = browser_map[b]
         for pf in program_files:
             if not pf:
@@ -1028,6 +996,7 @@ def find_chromium():
             if os.path.exists(full_path):
                 return full_path
                 
+    # Fallback to EdgeCore
     edgecore_base = r"C:\Program Files (x86)\Microsoft\EdgeCore"
     if os.path.exists(edgecore_base):
         optimized = os.path.join(edgecore_base, "Optimized", "msedge.exe")
