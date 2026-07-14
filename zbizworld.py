@@ -1000,6 +1000,7 @@ def find_chromium():
                 try:
                     with winreg.OpenKey(hive, path) as key:
                         val, _ = winreg.QueryValueEx(key, "")
+                        val = val.strip('"')
                         if os.path.exists(val):
                             return val
                 except Exception:
@@ -1667,26 +1668,38 @@ if __name__ == "__main__":
                 profile_dir = os.path.join(current_dir, "storage", "app_chrome_profile")
                 try:
                     os.makedirs(profile_dir, exist_ok=True)
-                    lock_file = os.path.join(profile_dir, "SingletonLock")
-                    if os.path.exists(lock_file):
-                        try:
-                            os.remove(lock_file)
-                        except Exception:
-                            pass
-                    clean_chrome_cache(profile_dir)
                 except Exception:
-                    pass
+                    # Fallback to temp folder if app folder is write-protected (e.g. Program Files)
+                    try:
+                        import tempfile
+                        profile_dir = os.path.join(tempfile.gettempdir(), "zbizworld_app_chrome_profile")
+                        os.makedirs(profile_dir, exist_ok=True)
+                    except Exception:
+                        profile_dir = None
+                        
+                if profile_dir:
+                    try:
+                        lock_file = os.path.join(profile_dir, "SingletonLock")
+                        if os.path.exists(lock_file):
+                            try:
+                                os.remove(lock_file)
+                            except Exception:
+                                pass
+                        clean_chrome_cache(profile_dir)
+                    except Exception:
+                        pass
  
                 # Start the browser process with optimizations for low-end PCs (disable sync/extensions, limit process & heap size)
                 chrome_args = [
                     chrome_exe,
                     "--app=http://127.0.0.1:9778",
-                    f"--user-data-dir={profile_dir}",
                     "--start-maximized",
                     "--disable-background-mode",
                     "--disable-extensions",
                     "--disable-sync"
                 ]
+                if profile_dir:
+                    chrome_args.append(f"--user-data-dir={profile_dir}")
                 browser_proc = subprocess.Popen(chrome_args, close_fds=True)
                 
                 # Start background trial check thread
