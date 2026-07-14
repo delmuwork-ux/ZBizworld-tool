@@ -954,24 +954,42 @@ def generate_license(hwid, target_dir, expire_time):
 def find_chromium():
     import winreg
     default_browser = None
+    
+    # Method 1: Query from http shell open command (extremely robust, no permission locks)
     try:
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice") as key:
-            prog_id, _ = winreg.QueryValueEx(key, "ProgId")
-            prog_id_lower = prog_id.lower()
-            if "chrome" in prog_id_lower:
+        with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, r"http\shell\open\command") as key:
+            cmd, _ = winreg.QueryValueEx(key, "")
+            cmd_lower = cmd.lower()
+            if "chrome.exe" in cmd_lower:
                 default_browser = "chrome"
-            elif "edge" in prog_id_lower or "msedge" in prog_id_lower:
+            elif "msedge.exe" in cmd_lower:
                 default_browser = "msedge"
-            elif "brave" in prog_id_lower:
+            elif "brave.exe" in cmd_lower:
                 default_browser = "brave"
     except Exception:
         pass
+
+    # Method 2: Query from UserChoice (fallback)
+    if not default_browser:
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice") as key:
+                prog_id, _ = winreg.QueryValueEx(key, "ProgId")
+                prog_id_lower = prog_id.lower()
+                if "chrome" in prog_id_lower:
+                    default_browser = "chrome"
+                elif "edge" in prog_id_lower or "msedge" in prog_id_lower:
+                    default_browser = "msedge"
+                elif "brave" in prog_id_lower:
+                    default_browser = "brave"
+        except Exception:
+            pass
 
     browsers = ["chrome", "msedge", "brave"]
     if default_browser and default_browser in browsers:
         browsers.remove(default_browser)
         browsers.insert(0, default_browser)
 
+    # 1. Search Registry App Paths
     for b in browsers:
         paths_to_check = [
             rf"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\{b}.exe",
@@ -987,22 +1005,24 @@ def find_chromium():
                 except Exception:
                     pass
 
+    # 2. Search common filesystem paths (Outer loop: prioritized browser, Inner loop: program files path)
     program_files = [
         os.environ.get("PROGRAMFILES", "C:\\Program Files"),
         os.environ.get("PROGRAMFILES(X86)", "C:\\Program Files (x86)"),
         os.environ.get("LOCALAPPDATA", "")
     ]
     
-    relative_paths = [
-        r"Google\Chrome\Application\chrome.exe",
-        r"BraveSoftware\Brave-Browser\Application\brave.exe",
-        r"Microsoft\Edge\Application\msedge.exe",
-    ]
+    browser_map = {
+        "chrome": r"Google\Chrome\Application\chrome.exe",
+        "brave": r"BraveSoftware\Brave-Browser\Application\brave.exe",
+        "msedge": r"Microsoft\Edge\Application\msedge.exe"
+    }
     
-    for pf in program_files:
-        if not pf:
-            continue
-        for rp in relative_paths:
+    for b in browsers:
+        rp = browser_map[b]
+        for pf in program_files:
+            if not pf:
+                continue
             full_path = os.path.join(pf, rp)
             if os.path.exists(full_path):
                 return full_path
@@ -1665,10 +1685,7 @@ if __name__ == "__main__":
                     "--start-maximized",
                     "--disable-background-mode",
                     "--disable-extensions",
-                    "--disable-sync",
-                    "--ignore-gpu-blocklist",
-                    "--enable-gpu-rasterization",
-                    "--enable-zero-copy"
+                    "--disable-sync"
                 ]
                 browser_proc = subprocess.Popen(chrome_args, close_fds=True)
                 
@@ -1690,14 +1707,34 @@ if __name__ == "__main__":
                 browser_proc.wait()
                 wait_duration = time.time() - start_wait_time
                 
-                # Browser closed, terminate backend server
-                # Note: if the browser process exited in under 5.0 seconds, it's highly likely
-                # a delegation launch to a running instance (or it exited due to profile lock).
-                # In this case, do NOT kill the backend, let it run.
-                if wait_duration > 5.0:
+                # Browser closed, check exit state
+                if wait_duration > 20.0 and browser_proc.returncode == 0:
+                    # Clean close by user after normal usage
                     cleanup_processes()
                 else:
-                    skip_backend_kill[0] = True
+                    # If it's a crash (non-zero exit code) or exited too quickly
+                    if browser_proc.returncode != 0:
+                        try:
+                            import webbrowser
+                            webbrowser.open("http://127.0.0.1:9778")
+                            show_windows_message(
+                                "AI Generate Tool", 
+                                "Trình duyệt ứng dụng gặp sự cố khởi động (Mã lỗi: {}).\n\nĐã tự động chuyển hướng giao diện sang Trình duyệt mặc định của hệ thống.".format(browser_proc.returncode), 
+                                "warning"
+                            )
+                            # Show blocking dialog to keep backend running until user closes it
+                            show_windows_message(
+                                "AI Generate Tool",
+                                "Ứng dụng đang chạy trên trình duyệt mặc định của bạn.\n\nNhấn OK để đóng hoàn toàn phần mềm.",
+                                "info"
+                            )
+                        except Exception:
+                            pass
+                        cleanup_processes()
+                    else:
+                        # Delegation launch (returncode == 0, wait_duration <= 20s)
+                        # The app is successfully running in user's default chrome browser tabs, do not kill backend
+                        skip_backend_kill[0] = True
             else:
                 import webbrowser
                 webbrowser.open("http://127.0.0.1:9778")
