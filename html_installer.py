@@ -133,9 +133,9 @@ class InstallerAPI:
             dst_exe = os.path.join(self.install_dir, "zbizworld.exe")
             dst_ico = os.path.join(self.install_dir, "Zbiz.ico")
 
-            # Check and download Stealth Chromium if missing
-            cloak_path = os.path.join(self.install_dir, "storage", "cloakbrowser")
-            if not os.path.exists(cloak_path) or self.install_type == "clean":
+            # Check and download Stealth Chromium if missing (verify the executable specifically)
+            chrome_exe_path = os.path.join(self.install_dir, "storage", "cloakbrowser", "chromium-146.0.7680.177.5", "chrome.exe")
+            if not os.path.exists(chrome_exe_path) or self.install_type == "clean":
                 self.set_progress(30, "Đang tải trình duyệt ẩn danh Stealth Chromium (535MB)...")
                 self.log("Đang tải Stealth Chromium từ GitHub...")
                 temp_zip = os.path.join(os.environ["TEMP"], "cloakbrowser.zip")
@@ -143,8 +143,10 @@ class InstallerAPI:
                 
                 self.set_progress(60, "Đang giải nén trình duyệt ẩn danh...")
                 self.log("Đang giải nén Stealth Chromium...")
+                extract_dest = os.path.join(self.install_dir, "storage", "cloakbrowser")
+                os.makedirs(extract_dest, exist_ok=True)
                 with zipfile.ZipFile(temp_zip, 'r') as zip_ref:
-                    zip_ref.extractall(os.path.join(self.install_dir, "storage"))
+                    zip_ref.extractall(extract_dest)
                 os.remove(temp_zip)
                 self.log("Giải nén trình duyệt thành công.")
 

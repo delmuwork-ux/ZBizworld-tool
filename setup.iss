@@ -57,7 +57,7 @@ Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/quiet /norestart"; StatusMsg:
 Filename: "{tmp}\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"; StatusMsg: "Dang tu dong tai va cai dat Microsoft Edge WebView2 Runtime..."; Check: not IsWebView2Installed
 
 ; Giai nen trinh duyet Stealth Chromium neu co tai tu GitHub ve
-Filename: "powershell.exe"; Parameters: "-NoProfile -WindowStyle Hidden -Command ""Expand-Archive -Path '{tmp}\cloakbrowser.zip' -DestinationPath '{app}\storage' -Force"""; StatusMsg: "Dang giai nen trinh duyet Stealth Chromium..."; Flags: runhidden; Check: FileExists(ExpandConstant('{tmp}\cloakbrowser.zip'))
+Filename: "powershell.exe"; Parameters: "-NoProfile -WindowStyle Hidden -Command ""Expand-Archive -Path '{tmp}\cloakbrowser.zip' -DestinationPath '{app}\storage\cloakbrowser' -Force"""; StatusMsg: "Dang giai nen trinh duyet Stealth Chromium..."; Flags: runhidden; Check: FileExists(ExpandConstant('{tmp}\cloakbrowser.zip'))
 
 ; Giai nen thanh phan he thong backend va dll tu GitHub ve
 Filename: "powershell.exe"; Parameters: "-NoProfile -WindowStyle Hidden -Command ""Expand-Archive -Path '{tmp}\backend_runtime.zip' -DestinationPath '{app}\storage\runtime' -Force"""; StatusMsg: "Dang giai nen cac thanh phan he thong..."; Flags: runhidden; Check: FileExists(ExpandConstant('{tmp}\backend_runtime.zip'))
